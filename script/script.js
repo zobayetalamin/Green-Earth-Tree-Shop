@@ -1,20 +1,615 @@
-const api={all:"https://openapi.programming-hero.com/api/plants",cats:"https://openapi.programming-hero.com/api/categories",byCat:id=>`https://openapi.programming-hero.com/api/category/${id}`,detail:id=>`https://openapi.programming-hero.com/api/plant/${id}`};
-const $=s=>document.querySelector(s);
-const el=(t,p={},c=[])=>{const e=document.createElement(t);for(const k in p){const v=p[k];if(k==="class")e.className=v;else if(k==="text")e.textContent=v;else if(k.startsWith("data-"))e.setAttribute(k,v);else e[k]=v}([].concat(c)).filter(Boolean).forEach(ch=>e.appendChild(typeof ch==="string"?document.createTextNode(ch):ch));return e};
-const showSpinner=s=>{$("#spinner")&&$("#spinner").classList.toggle("hidden",!s)};
-const money=n=>`৳${(Number(n)||0).toLocaleString("bn-BD")}`;
-const state={activeCat:null,cart:[]};
-const fetchJSON=async u=>{const r=await fetch(u);if(!r.ok)throw new Error("Network");return r.json()};
+let currentCategory = 'All Trees';
+let cart = [];
 
-const loadCats=async()=>{showSpinner(true);try{const j=await fetchJSON(api.cats);const arr=j?.categories||j?.data||[];renderCats(arr)}catch(e){$("#catList")&&($("#catList").innerHTML='<div class="text-red-600">Failed to load categories</div>')}finally{showSpinner(false)}};
-const renderCats=arr=>{const wrap=$("#catList");if(!wrap)return;wrap.innerHTML="";wrap.append(el("h3",{class:"text-lg font-semibold text-gray-800 mb-2",text:"Categories"}));const box=el("div",{class:"grid grid-cols-2 md:grid-cols-1 gap-2"});arr.forEach(c=>{const id=c?.id||c?.category_id||c?.slug||c?.name;const name=c?.name||c?.title||`Category ${id}`;const btn=el("button",{class:`btn w-full justify-start ${String(id)===String(state.activeCat)?"bg-[#15803D] text-white":"bg-white text-gray-800"} border rounded-lg`,text:name});btn.addEventListener("click",()=>{state.activeCat=id;[...box.children].forEach(b=>b.classList.remove("bg-[#15803D]","text-white"));btn.classList.add("bg-[#15803D]","text-white");loadByCategory(id)});box.append(btn)});wrap.append(box)};
-const loadAll=async()=>{showSpinner(true);try{const j=await fetchJSON(api.all);const items=j?.plants||j?.data||[];renderCards(items)}catch(e){$("#cardGrid")&&($("#cardGrid").innerHTML='<p class="text-red-600">Failed to load plants</p>')}finally{showSpinner(false)}};
-const loadByCategory=async id=>{showSpinner(true);try{const j=await fetchJSON(api.byCat(id));const items=j?.plants||j?.data||[];renderCards(items)}catch(e){$("#cardGrid")&&($("#cardGrid").innerHTML='<p class="text-red-600">Failed to load category items</p>')}finally{showSpinner(false)}};
-const textShort=s=>{const t=String(s||"");return t.length>100?t.slice(0,97)+"...":t};
-const renderCards=items=>{const grid=$("#cardGrid");if(!grid)return;grid.innerHTML="";if(!items||!items.length){grid.innerHTML='<p class="text-gray-600">No plants found</p>';return}items.forEach(p=>{const id=p?.id||p?.plant_id||p?._id||p?.slug||p?.uid;const name=p?.name||p?.title||p?.plant_name||"Unknown Plant";const img=p?.image||p?.img||p?.thumbnail||p?.photo||"";const cat=p?.category||p?.category_name||p?.type||"—";const desc=p?.short_description||p?.description||p?.details||"";const price=p?.price||p?.cost||p?.amount||0;const card=el("div",{class:"rounded-2xl bg-white p-4 shadow hover:shadow-lg transition flex flex-col"});const pic=el("img",{src:img,alt:name,class:"w-full h-40 object-cover rounded-xl mb-3 bg-gray-100"});const title=el("button",{class:"text-lg font-semibold text-gray-900 text-left hover:underline",text:name});title.addEventListener("click",()=>openModal(id));const d=el("p",{class:"text-gray-600 text-sm mt-1",text:textShort(desc)});const meta=el("div",{class:"mt-2 text-xs text-gray-500"},[el("span",{text:`Category: ${cat}`})]);const bottom=el("div",{class:"mt-auto pt-3 flex items-center justify-between"},[el("span",{class:"font-semibold text-[#15803D]",text:money(price)}),el("button",{class:"btn btn-sm rounded-full bg-[#FACC15] text-[#15803D]"},["Add to Cart"])]);bottom.lastChild.addEventListener("click",()=>addToCart({id,name,price}));card.append(pic,title,d,meta,bottom);grid.append(card)})};
-const openModal=async id=>{const dlg=$("#treeModal");const box=$("#modalContent");if(!dlg||!box)return;box.innerHTML="";showSpinner(true);try{const j=await fetchJSON(api.detail(id));const p=j?.plant||j?.data||j||{};const name=p?.name||p?.title||p?.plant_name||"Tree Details";const img=p?.image||p?.img||p?.thumbnail||"";const cat=p?.category||p?.category_name||"—";const price=p?.price||0;const desc=p?.description||p?.details||"";const info=el("div",{class:"grid grid-cols-1 md:grid-cols-3 gap-4"});const left=el("div",{class:"md:col-span-1"},[el("img",{src:img,alt:name,class:"w-full h-48 object-cover rounded-xl bg-gray-100"})]);const right=el("div",{class:"md:col-span-2 space-y-2"},[el("h3",{class:"text-xl font-semibold text-gray-900",text:name}),el("div",{class:"text-sm text-gray-600"},[el("span",{text:`Category: ${cat}`})]),el("p",{class:"text-gray-700"},[desc||""]),el("div",{class:"pt-2 flex items-center justify-between"},[el("span",{class:"font-semibold text-[#15803D]",text:money(price)}),el("button",{id:"modalAdd",class:"btn rounded-full bg-[#FACC15] text-[#15803D]"},["Add to Cart"])])]);info.append(left,right);box.append(info);$("#modalAdd").addEventListener("click",()=>{addToCart({id,name,price});dlg.close()});dlg.showModal()}catch(e){box.innerHTML='<p class="text-red-600">Failed to load details</p>';dlg.showModal()}finally{showSpinner(false)}};
-const addToCart=item=>{state.cart.push({...item,uid:crypto.randomUUID?.():Math.random().toString(36).slice(2)});renderCart()};
-const removeFromCart=uid=>{state.cart=state.cart.filter(i=>i.uid!==uid);renderCart()};
-const renderCart=()=>{const list=$("#cartList");if(!list)return;list.innerHTML="";let total=0;state.cart.forEach(i=>{total+=Number(i.price)||0;const li=el("li",{class:"flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2"});const left=el("div",{class:"flex-1"},[el("p",{class:"text-sm font-medium text-gray-800",text:i.name}),el("span",{class:"text-xs text-gray-500",text:money(i.price)})]);const rm=el("button",{class:"text-gray-500 hover:text-red-600 text-lg leading-none"},["❌"]);rm.addEventListener("click",()=>removeFromCart(i.uid));li.append(left,rm);list.append(li)});$("#cartTotal")&&($("#cartTotal").textContent=money(total))};
-const init=async()=>{if(!$("#catList")||!$("#cardGrid")||!$("#cartList")||!$("#cartTotal")||!$("#treeModal")||!$("#modalContent"))return;await Promise.all([loadCats(),loadAll()])};
-document.addEventListener("DOMContentLoaded",init);
+const categories = [
+    'All Trees',
+    'Fruit Trees', 
+    'Flowering Trees',
+    'Shade Trees',
+    'Medicinal Trees',
+    'Timber Trees',
+    'Evergreen Trees',
+    'Ornamental Plants',
+    'Bamboo',
+    'Climbers',
+    'Aquatic Plants'
+];
+
+const trees = [
+    {
+        id: 1,
+        name: 'Mango Tree',
+        description: 'A fast-growing tropical tree that produces delicious, juicy mangoes during summer. Its dense green foliage provides excellent shade.',
+        category: 'Fruit Tree',
+        price: 500,
+        image: 'https://images.unsplash.com/photo-1553279453-d97b9bb1f2ef?w=300&h=200&fit=crop'
+    },
+    {
+        id: 2,
+        name: 'Guava Tree',
+        description: 'A hardy fruit tree known for its nutritious fruits and medicinal properties. Easy to grow and maintain.',
+        category: 'Fruit Tree', 
+        price: 350,
+        image: 'https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?w=300&h=200&fit=crop'
+    },
+    {
+        id: 3,
+        name: 'Jackfruit Tree',
+        description: 'Large tropical tree producing the worlds largest tree fruit. Known for its sweet taste and nutritional value.',
+        category: 'Fruit Tree',
+        price: 600,
+        image: 'https://images.unsplash.com/photo-1601047083194-3bb70c85844a?w=300&h=200&fit=crop'
+    },
+    {
+        id: 4,
+        name: 'Rose Plant',
+        description: 'Beautiful flowering plant with fragrant blooms. Perfect for gardens and ornamental purposes.',
+        category: 'Flowering Trees',
+        price: 200,
+        image: 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?w=300&h=200&fit=crop'
+    },
+    {
+        id: 5,
+        name: 'Neem Tree',
+        description: 'Sacred medicinal tree with antibacterial properties. Provides natural pest control and health benefits.',
+        category: 'Medicinal Trees',
+        price: 400,
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=300&h=200&fit=crop'
+    },
+    {
+        id: 6,
+        name: 'Banyan Tree',
+        description: 'Majestic shade tree with extensive canopy. Symbol of longevity and provides excellent natural cooling.',
+        category: 'Shade Trees',
+        price: 800,
+        image: 'https://images.unsplash.com/photo-1574687253531-526cfc1c50b0?w=300&h=200&fit=crop'
+    },
+    {
+        id: 7,
+        name: 'Coconut Tree',
+        description: 'Tall tropical palm tree producing coconuts. Excellent for coastal areas and provides multiple uses.',
+        category: 'Fruit Tree',
+        price: 450,
+        image: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=300&h=200&fit=crop'
+    },
+    {
+        id: 8,
+        name: 'Jasmine Plant',
+        description: 'Fragrant flowering plant with white blooms. Perfect for aromatic gardens and natural decoration.',
+        category: 'Flowering Trees',
+        price: 150,
+        image: 'https://images.unsplash.com/photo-1463320726281-696a485928c7?w=300&h=200&fit=crop'
+    },
+    {
+        id: 9,
+        name: 'Tulsi Plant',
+        description: 'Sacred medicinal herb with numerous health benefits. Essential for traditional medicine and worship.',
+        category: 'Medicinal Trees',
+        price: 100,
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=200&fit=crop'
+    },
+    {
+        id: 10,
+        name: 'Teak Tree',
+        description: 'Premium hardwood tree valued for its durability. Excellent for timber and long-term investment.',
+        category: 'Timber Trees',
+        price: 700,
+        image: 'https://images.unsplash.com/photo-1582193906649-cb84848bc4fa?w=300&h=200&fit=crop'
+    },
+    {
+        id: 11,
+        name: 'Pine Tree',
+        description: 'Evergreen coniferous tree with needle-like leaves. Great for mountainous regions and landscaping.',
+        category: 'Evergreen Trees',
+        price: 550,
+        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=200&fit=crop'
+    },
+    {
+        id: 12,
+        name: 'Bougainvillea',
+        description: 'Colorful ornamental plant with vibrant bracts. Perfect for decorative gardens and fencing.',
+        category: 'Ornamental Plants',
+        price: 180,
+        image: 'https://images.unsplash.com/photo-1595461899929-5e55b4118eed?w=300&h=200&fit=crop'
+    }
+];
+
+function showLoading() {
+    document.getElementById('treesContainer').innerHTML = `
+        <div class="col-span-3 flex justify-center items-center h-64">
+            <span class="loading loading-bars loading-xl"></span>
+        </div>
+    `;
+}
+
+function renderCategories() {
+    const categoriesHTML = categories.map(category => `
+        <li class="category-item ${category === currentCategory ? 'active' : ''}" onclick="selectCategory('${category}')">
+            ${category}
+        </li>
+    `).join('');
+
+    document.getElementById('categoriesList').innerHTML = categoriesHTML;
+}
+
+function selectCategory(category) {
+    currentCategory = category;
+    renderCategories();
+    showLoading();
+    
+    setTimeout(() => {
+        renderTrees();
+    }, 500);
+}
+
+function renderTrees() {
+    const filteredTrees = currentCategory === 'All Trees' 
+        ? trees 
+        : trees.filter(tree => tree.category === currentCategory);
+
+    const treesHTML = filteredTrees.map(tree => `
+        <div class="tree-card">
+            <div class="tree-image">
+                <img src="${tree.image}" alt="${tree.name}" class="tree-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div class="placeholder-image" style="display: none;"></div>
+            </div>
+            <div class="tree-info">
+                <h3 class="tree-name" onclick="showTreeModal(${tree.id})">${tree.name}</h3>
+                <p class="tree-description">${tree.description}</p>
+                <div class="tree-meta">
+                    <span class="tree-category">${tree.category}</span>
+                    <span class="tree-price">৳${tree.price}</span>
+                </div>
+                <button class="add-to-cart-btn" onclick="addToCart(${tree.id})">Add to Cart</button>
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('treesContainer').innerHTML = treesHTML || '<div class="col-span-3 text-center text-gray-500">No trees found in this category</div>';
+}
+
+function showTreeModal(treeId) {
+    const tree = trees.find(t => t.id === treeId);
+    if (!tree) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'tree-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>${tree.name}</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-image">
+                    <img src="${tree.image}" alt="${tree.name}" class="modal-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="placeholder-image" style="display: none;"></div>
+                </div>
+                <div class="modal-info">
+                    <h3>Description</h3>
+                    <p>${tree.description}</p>
+                    <div class="modal-meta">
+                        <div>
+                            <strong>Category:</strong>
+                            <span class="tree-category">${tree.category}</span>
+                        </div>
+                        <div>
+                            <strong>Price:</strong>
+                            <span class="tree-price">৳${tree.price}</span>
+                        </div>
+                    </div>
+                    <button class="add-to-cart-btn" onclick="addToCart(${tree.id}); closeModal()">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+function closeModal() {
+    const modal = document.querySelector('.tree-modal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+function addToCart(treeId) {
+    const tree = trees.find(t => t.id === treeId);
+    if (!tree) return;
+
+    const existingItem = cart.find(item => item.id === treeId);
+    if (existingItem) {
+        existingItem.quantity += 1;
+    } else {
+        cart.push({
+            id: treeId,
+            name: tree.name,
+            price: tree.price,
+            quantity: 1
+        });
+    }
+
+    updateCart();
+}
+
+function removeFromCart(treeId) {
+    cart = cart.filter(item => item.id !== treeId);
+    updateCart();
+}
+
+function updateCart() {
+    const cartItemsHTML = cart.map(item => `
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <div class="cart-item-name">${item.name}</div>
+                <div class="cart-item-details">৳${item.price} x ${item.quantity}</div>
+            </div>
+            <button class="remove-btn" onclick="removeFromCart(${item.id})">×</button>
+        </div>
+    `).join('');
+
+    document.getElementById('cartItems').innerHTML = cartItemsHTML || '<div class="empty-cart">Cart is empty</div>';
+
+    const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    document.getElementById('cartTotal').textContent = `৳${total}`;
+}
+
+function initializeApp() {
+    const appHTML = `
+        <section class="tree-selection-section">
+            <div class="container">
+                <h2 class="section-title">Choose Your Trees</h2>
+                <div class="main-content">
+                    <div class="sidebar">
+                        <div class="categories">
+                            <h3>Categories</h3>
+                            <ul id="categoriesList"></ul>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div id="treesContainer" class="trees-grid"></div>
+                    </div>
+                    <div class="cart-sidebar">
+                        <div class="cart">
+                            <h3>Your Cart</h3>
+                            <div id="cartItems"></div>
+                            <div class="cart-total">
+                                <strong>Total: <span id="cartTotal">৳0</span></strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    `;
+
+    const targetSection = document.querySelector('section.bg-\\[\\#CFF0DC\\]');
+    targetSection.insertAdjacentHTML('afterend', appHTML);
+
+    const styles = `
+        <style>
+        .tree-selection-section {
+            background: rgba(240,253,244,1);
+            padding: 2rem 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        .section-title {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1F2937;
+            margin-bottom: 2rem;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 200px 1fr 250px;
+            gap: 2rem;
+        }
+        
+        .sidebar {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            height: fit-content;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .categories h3 {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1F2937;
+        }
+        
+        .categories ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .category-item {
+            padding: 0.75rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            color: #4B5563;
+            margin-bottom: 0.25rem;
+        }
+        
+        .category-item:hover {
+            background: #F3F4F6;
+        }
+        
+        .category-item.active {
+            background: #15803D;
+            color: white;
+        }
+        
+        .trees-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+        
+        .tree-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .tree-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .tree-image {
+            height: 150px;
+            margin-bottom: 1rem;
+        }
+        
+        .tree-img, .modal-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+        
+        .placeholder-image {
+            width: 100%;
+            height: 100%;
+            background: #E5E7EB;
+            border-radius: 6px;
+        }
+        
+        .tree-name {
+            font-weight: 600;
+            color: #1F2937;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+        }
+        
+        .tree-name:hover {
+            color: #15803D;
+        }
+        
+        .tree-description {
+            font-size: 0.875rem;
+            color: #6B7280;
+            margin-bottom: 1rem;
+            line-height: 1.4;
+        }
+        
+        .tree-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .tree-category {
+            background: #DCFCE7;
+            color: #15803D;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .tree-price {
+            font-weight: 600;
+            font-size: 1.125rem;
+            color: #1F2937;
+        }
+        
+        .add-to-cart-btn {
+            width: 100%;
+            background: #15803D;
+            color: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .add-to-cart-btn:hover {
+            background: #166534;
+        }
+        
+        .cart-sidebar {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            height: fit-content;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .cart h3 {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1F2937;
+        }
+        
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #F3F4F6;
+        }
+        
+        .cart-item-name {
+            font-weight: 500;
+            color: #1F2937;
+            font-size: 0.875rem;
+        }
+        
+        .cart-item-details {
+            font-size: 0.75rem;
+            color: #6B7280;
+        }
+        
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #EF4444;
+            cursor: pointer;
+            font-size: 1.25rem;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .remove-btn:hover {
+            background: #FEF2F2;
+            border-radius: 50%;
+        }
+        
+        .cart-total {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #F3F4F6;
+            font-size: 1.125rem;
+            color: #1F2937;
+        }
+        
+        .empty-cart {
+            text-align: center;
+            color: #6B7280;
+            font-size: 0.875rem;
+            padding: 2rem 0;
+        }
+        
+        .tree-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid #F3F4F6;
+        }
+        
+        .modal-header h2 {
+            font-weight: 600;
+            color: #1F2937;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6B7280;
+        }
+        
+        .close-btn:hover {
+            color: #374151;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .modal-image {
+            height: 200px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-info h3 {
+            font-weight: 600;
+            color: #1F2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .modal-info p {
+            color: #6B7280;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-meta {
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-meta > div {
+            margin-bottom: 1rem;
+        }
+        
+        .modal-meta strong {
+            color: #1F2937;
+            margin-right: 0.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .trees-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        </style>
+    `;
+
+    document.head.insertAdjacentHTML('beforeend', styles);
+
+    renderCategories();
+    renderTrees();
+    updateCart();
+}
+
+document.addEventListener('DOMContentLoaded', initializeApp);
